@@ -1,5 +1,5 @@
 import { Server, Socket } from "socket.io";
-import { handleDisconnect, handleFindPartner, handleMessage } from "../controllers/chat.controller";
+import { handleCancelSearch, handleDisconnect, handleFindPartner, handleMessage } from "../controllers/chat.controller";
 import redis from "../redis";
 import { sendDiscordMessage } from "../utils/webhookNotify";
 
@@ -7,11 +7,13 @@ import { sendDiscordMessage } from "../utils/webhookNotify";
 export default function registerChatHandlers(io: Server, socket: Socket) {
     console.log("📥 Chat socket ready for:",socket.id);
 
-    socket.on("find:partner", async(data) => {
-        await sendDiscordMessage(`🔍 A user is looking for a chat partner (socket ID: ${data.userId})`);
+    socket.on("find:partner", async (data) => {
+    sendDiscordMessage(`🔍 A user is looking for a chat partner (socket ID: ${data.userId})`)
+        .catch(err => console.error("Failed to send Discord message:", err.message));
 
-        handleFindPartner(io, socket, data);
+    handleFindPartner(io, socket, data);
     });
+
 
     socket.on("chat:message",async(data) =>{
         try{
@@ -23,14 +25,15 @@ export default function registerChatHandlers(io: Server, socket: Socket) {
     });
 
 
-    socket.on("partner:cancel", async () => {
-        const userId = await redis.get(`socket:${socket.id}:user`);
-        if (userId) {
-            await redis.lrem("waitingUsers", 0, JSON.stringify({ socketId: socket.id, userId }));
-            await redis.srem("waitingUsers:set", userId);
-            await redis.del(`socket:${socket.id}:user`);
-            console.log(`🛑 User ${userId} cancelled partner search.`);
-        }
+    socket.on("search:cancel", () => handleCancelSearch(socket));
+
+
+    socket.on("chat:reaction", ({ roomId, messageId, senderId, reaction }) => {
+        io.to(roomId).emit("chat:reaction", {
+            messageId,
+            senderId,
+            reaction,
+        });
     });
 
 
