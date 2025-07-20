@@ -303,11 +303,17 @@ export const verifyUser = async(req:Request,res:Response):Promise<Response> => {
         const userId = req.userId;
         const email = req.username;
 
+        const user = await User.findOne({_id: userId, email: email});
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
         return res.status(200).json({
             message: "User verified successfully!!!",
             userId: userId,
             email: email
-        })
+        });
     }catch(error){
         console.error("Server Error:",error)
         return res.status(500).json({message:"Internal server error"})
